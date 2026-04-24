@@ -1,0 +1,27 @@
+syntax = "proto3";
+
+package approval;
+
+// Service for submitting expense reports for approval via gRPC.
+// Used by request-service to communicate with approval-service.
+service ApprovalService {
+  // Submit an expense report for approval decision.
+  rpc SubmitForApproval (ApprovalRequest) returns (ApprovalResponse);
+}
+
+message ApprovalRequest {
+  string expense_id = 1;
+  string title = 2;
+  double amount = 3;
+  string currency = 4;
+  string description = 5;
+  string submitted_by = 6;
+}
+
+message ApprovalResponse {
+  string expense_id = 1;
+  string status = 2;       // APPROVED or REJECTED
+  string reason = 3;
+  string decided_by = 4;
+  string decided_at = 5;   // ISO 8601 timestamp
+}

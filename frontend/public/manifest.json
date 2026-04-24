@@ -1,0 +1,9 @@
+{
+  "name": "Reise-Spesen-Planer",
+  "short_name": "SpesenPlaner",
+  "theme_color": "#6366f1",
+  "background_color": "#0a0e1a",
+  "display": "standalone",
+  "scope": "/",
+  "start_url": "/"
+}

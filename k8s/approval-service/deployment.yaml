@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: approval-service
+  namespace: reise-spesen-planer
+  labels:
+    app: approval-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: approval-service
+  template:
+    metadata:
+      labels:
+        app: approval-service
+    spec:
+      containers:
+        - name: approval-service
+          image: rsp/approval-service:latest
+          ports:
+            - containerPort: 3002
+              name: http
+            - containerPort: 50051
+              name: grpc
+          env:
+            - name: BUDGET_SERVICE_URL
+              value: "http://budget-service:3003"
+            - name: DATABASE_URL
+              value: "sqlite+aiosqlite:///./approval.db"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 400m
+              memory: 256Mi
+          volumeMounts:
+            - name: data
+              mountPath: /app
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3002
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3002
+            initialDelaySeconds: 10
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: approval-service-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: approval-service-pvc
+  namespace: reise-spesen-planer
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: approval-service
+  namespace: reise-spesen-planer
+spec:
+  selector:
+    app: approval-service
+  ports:
+    - port: 3002
+      targetPort: 3002
+      name: http
+    - port: 50051
+      targetPort: 50051
+      name: grpc
+  type: ClusterIP
+---
+# HPA: Mittlere Last, gRPC-Kommunikation ist effizient
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: approval-service-hpa
+  namespace: reise-spesen-planer
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: approval-service
+  minReplicas: 1
+  maxReplicas: 4
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

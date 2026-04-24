@@ -1,0 +1,163 @@
+services:
+  # =============================================
+  # Infrastructure
+  # =============================================
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.6.0
+    container_name: rsp-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - rsp-network
+
+  kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: rsp-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    networks:
+      - rsp-network
+
+  init-kafka:
+    image: confluentinc/cp-kafka:7.6.0
+    container_name: rsp-init-kafka
+    depends_on:
+      - kafka
+    entrypoint: [ '/bin/sh', '-c' ]
+    command: |
+      "
+      echo -e 'Waiting for Kafka to be ready...'
+      cub kafka-ready -b kafka:29092 1 20
+      echo -e 'Creating kafka topics...'
+      kafka-topics --bootstrap-server kafka:29092 --create --if-not-exists --topic payout-requests --replication-factor 1 --partitions 1
+      echo -e 'Successfully created the topics.'
+      "
+    networks:
+      - rsp-network
+
+  # =============================================
+  # API Gateway
+  # =============================================
+  api-gateway:
+    build: ./api-gateway
+    container_name: rsp-api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      REQUEST_SERVICE_URL: http://request-service:3001
+      APPROVAL_SERVICE_URL: http://approval-service:3002
+      BUDGET_SERVICE_URL: http://budget-service:3003
+      PAYOUT_SERVICE_URL: http://payout-service:3004
+      SECRET_KEY: docker-compose-secret-key-change-in-production
+      ALLOWED_ORIGINS: http://localhost:4200,http://localhost:8080
+      DATABASE_URL: sqlite+aiosqlite:////tmp/gateway.db
+    depends_on:
+      - request-service
+      - approval-service
+      - budget-service
+      - payout-service
+    networks:
+      - rsp-network
+
+  # =============================================
+  # Backend Services
+  # =============================================
+  request-service:
+    build:
+      context: .
+      dockerfile: backend/request-service/Dockerfile
+    container_name: rsp-request-service
+    ports:
+      - "3001:3001"
+    environment:
+      APPROVAL_GRPC_HOST: approval-service:50051
+      DATABASE_URL: sqlite+aiosqlite:////tmp/request.db
+    networks:
+      - rsp-network
+
+  approval-service:
+    build:
+      context: .
+      dockerfile: backend/approval-service/Dockerfile
+    container_name: rsp-approval-service
+    ports:
+      - "3002:3002"
+      - "50051:50051"
+    environment:
+      BUDGET_SERVICE_URL: http://budget-service:3003
+      DATABASE_URL: sqlite+aiosqlite:////tmp/approval.db
+    networks:
+      - rsp-network
+
+  budget-service:
+    build: ./backend/budget-service
+    container_name: rsp-budget-service
+    ports:
+      - "3003:3003"
+    environment:
+      REQUEST_SERVICE_URL: http://request-service:3001
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_PAYOUT_TOPIC: payout-requests
+      DATABASE_URL: sqlite+aiosqlite:////tmp/budget.db
+    depends_on:
+      init-kafka:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_started
+    networks:
+      - rsp-network
+
+  payout-service:
+    build: ./backend/payout-service
+    container_name: rsp-payout-service
+    ports:
+      - "3004:3004"
+    environment:
+      REQUEST_SERVICE_URL: http://request-service:3001
+      KAFKA_BOOTSTRAP_SERVERS: kafka:29092
+      KAFKA_PAYOUT_TOPIC: payout-requests
+      KAFKA_GROUP_ID: payout-service-group
+      DATABASE_URL: sqlite+aiosqlite:////tmp/payout.db
+    depends_on:
+      init-kafka:
+        condition: service_completed_successfully
+      kafka:
+        condition: service_started
+    networks:
+      - rsp-network
+
+  # =============================================
+  # Frontend
+  # =============================================
+  frontend:
+    build: ./frontend
+    container_name: rsp-frontend
+    ports:
+      - "8080:80"
+    depends_on:
+      - api-gateway
+    networks:
+      - rsp-network
+
+# =============================================
+# Volumes (Persistent Data)
+# =============================================
+# =============================================
+# Network
+# =============================================
+networks:
+  rsp-network:
+    driver: bridge

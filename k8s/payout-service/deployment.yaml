@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: payout-service
+  namespace: reise-spesen-planer
+  labels:
+    app: payout-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: payout-service
+  template:
+    metadata:
+      labels:
+        app: payout-service
+    spec:
+      containers:
+        - name: payout-service
+          image: rsp/payout-service:latest
+          ports:
+            - containerPort: 3004
+          env:
+            - name: REQUEST_SERVICE_URL
+              value: "http://request-service:3001"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "kafka:9092"
+            - name: KAFKA_PAYOUT_TOPIC
+              value: "payout-requests"
+            - name: KAFKA_GROUP_ID
+              value: "payout-service-group"
+            - name: DATABASE_URL
+              value: "sqlite+aiosqlite:///./payout.db"
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 300m
+              memory: 256Mi
+          volumeMounts:
+            - name: data
+              mountPath: /app
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3004
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3004
+            initialDelaySeconds: 10
+            periodSeconds: 30
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: payout-service-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: payout-service-pvc
+  namespace: reise-spesen-planer
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: payout-service
+  namespace: reise-spesen-planer
+spec:
+  selector:
+    app: payout-service
+  ports:
+    - port: 3004
+      targetPort: 3004
+  type: ClusterIP
+---
+# HPA: Geringste Last (Kafka-Consumer), höchste Schwelle (75%)
+# Asynchrone Verarbeitung erfordert kein sofortiges Scaling
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: payout-service-hpa
+  namespace: reise-spesen-planer
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: payout-service
+  minReplicas: 1
+  maxReplicas: 3
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 75
