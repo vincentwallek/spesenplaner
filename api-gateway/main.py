@@ -23,6 +23,7 @@ from auth import (
     TokenData,
     UserCreate,
     UserResponse,
+    async_session,
 )
 from config import (
     ALLOWED_ORIGINS,
@@ -163,6 +164,164 @@ async def update_role(
 async def health_check():
     """Health check endpoint for Kubernetes probes."""
     return {"status": "healthy", "service": "api-gateway"}
+
+
+# =============================================
+# Monitoring Endpoints (Admin/Manager only)
+# =============================================
+
+import asyncio
+import time
+
+SERVICE_ENDPOINTS = {
+    "request-service": {"url": REQUEST_SERVICE_URL, "port": 3001},
+    "approval-service": {"url": APPROVAL_SERVICE_URL, "port": 3002},
+    "budget-service": {"url": BUDGET_SERVICE_URL, "port": 3003},
+    "payout-service": {"url": PAYOUT_SERVICE_URL, "port": 3004},
+}
+
+
+async def _check_service_health(client: httpx.AsyncClient, name: str, base_url: str) -> dict:
+    """Check a single service's health and measure response time."""
+    start = time.monotonic()
+    try:
+        resp = await client.get(f"{base_url}/health", timeout=5.0)
+        elapsed_ms = round((time.monotonic() - start) * 1000, 1)
+        data = resp.json()
+        return {
+            "service": name,
+            "status": "healthy" if resp.status_code == 200 else "degraded",
+            "response_time_ms": elapsed_ms,
+            "details": data,
+        }
+    except Exception:
+        elapsed_ms = round((time.monotonic() - start) * 1000, 1)
+        return {
+            "service": name,
+            "status": "unhealthy",
+            "response_time_ms": elapsed_ms,
+            "details": None,
+        }
+
+
+async def _fetch_service_metrics(client: httpx.AsyncClient, name: str, base_url: str) -> dict:
+    """Fetch metrics from a single service."""
+    try:
+        resp = await client.get(f"{base_url}/metrics", timeout=10.0)
+        if resp.status_code == 200:
+            return {"service": name, "metrics": resp.json()}
+    except Exception:
+        pass
+    return {"service": name, "metrics": None}
+
+
+@app.get("/api/v1/monitoring/dashboard", tags=["Monitoring"])
+async def monitoring_dashboard(
+    request: Request,
+    current_user: TokenData = Depends(get_current_user),
+):
+    """
+    Aggregated monitoring dashboard data.
+    Fetches health status and metrics from all backend services in parallel.
+    Only accessible by admin and manager roles.
+    """
+    if current_user.role not in ["admin", "manager"]:
+        raise HTTPException(status_code=403, detail="Monitoring requires admin or manager role")
+
+    client: httpx.AsyncClient = request.app.state.http_client
+
+    # Parallel health checks
+    health_tasks = [
+        _check_service_health(client, name, info["url"])
+        for name, info in SERVICE_ENDPOINTS.items()
+    ]
+    health_results = await asyncio.gather(*health_tasks)
+
+    # Parallel metrics collection
+    metrics_tasks = [
+        _fetch_service_metrics(client, name, info["url"])
+        for name, info in SERVICE_ENDPOINTS.items()
+    ]
+    metrics_results = await asyncio.gather(*metrics_tasks)
+
+    # Build metrics dict keyed by service name
+    metrics_by_service = {m["service"]: m["metrics"] for m in metrics_results}
+
+    # Overall system status
+    statuses = [h["status"] for h in health_results]
+    if all(s == "healthy" for s in statuses):
+        overall_status = "healthy"
+    elif any(s == "unhealthy" for s in statuses):
+        overall_status = "degraded"
+    else:
+        overall_status = "partial"
+
+    # Count registered users
+    from auth import get_all_users
+    async with async_session() as session:
+        users = await get_all_users(session)
+        user_count = len(users)
+
+    from datetime import datetime, timezone
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "overall_status": overall_status,
+        "services": health_results,
+        "metrics": {
+            "expenses": metrics_by_service.get("request-service"),
+            "approvals": metrics_by_service.get("approval-service"),
+            "budgets": metrics_by_service.get("budget-service"),
+            "payouts": metrics_by_service.get("payout-service"),
+        },
+        "system": {
+            "registered_users": user_count,
+            "services_count": len(SERVICE_ENDPOINTS),
+            "healthy_services": statuses.count("healthy"),
+        },
+    }
+
+
+@app.get("/api/v1/monitoring/logs", tags=["Monitoring"])
+async def monitoring_logs(
+    request: Request,
+    current_user: TokenData = Depends(get_current_user),
+):
+    """
+    Aggregated activity log from all services — recent expenses as audit trail.
+    Only accessible by admin and manager roles.
+    """
+    if current_user.role not in ["admin", "manager"]:
+        raise HTTPException(status_code=403, detail="Monitoring requires admin or manager role")
+
+    client: httpx.AsyncClient = request.app.state.http_client
+
+    logs = []
+
+    # Fetch recent expenses from request-service
+    try:
+        resp = await client.get(f"{REQUEST_SERVICE_URL}/metrics", timeout=10.0)
+        if resp.status_code == 200:
+            data = resp.json()
+            for exp in data.get("recent_expenses", []):
+                logs.append({
+                    "timestamp": exp.get("created_at"),
+                    "service": "request-service",
+                    "action": f"Expense {exp.get('status', 'UNKNOWN')}",
+                    "details": f"{exp.get('title', '?')} — {exp.get('amount', 0)} {exp.get('currency', 'EUR')}",
+                    "user": exp.get("created_by", "unknown"),
+                })
+    except Exception:
+        pass
+
+    # Sort by timestamp descending
+    logs.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+
+    from datetime import datetime, timezone
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "total": len(logs),
+        "logs": logs,
+    }
 
 
 # =============================================

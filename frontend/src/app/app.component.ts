@@ -39,6 +39,11 @@ import { AuthService } from './services/auth.service';
                   <span>Benutzerverwaltung</span>
                 </a>
               </li>
+              <li>
+                <a routerLink="/monitoring" routerLinkActive="active" id="nav-monitoring">
+                  <span>Monitoring</span>
+                </a>
+              </li>
             }
           </ul>
 

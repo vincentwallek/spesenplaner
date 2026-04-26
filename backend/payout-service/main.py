@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import init_db, get_db
-from crud import list_records, get_record, get_record_by_expense, process_payout
+from crud import list_records, get_record, get_record_by_expense, process_payout, get_payout_metrics
 from schemas import PayoutResponse
 from kafka_consumer import consume_payout_events
 
@@ -104,6 +104,16 @@ async def _notify_request_service(expense_id: str, status: str):
 @app.get("/health", tags=["Health"])
 async def health_check():
     return {"status": "healthy", "service": "payout-service"}
+
+
+# =============================================
+# Metrics Endpoint (Monitoring)
+# =============================================
+
+@app.get("/metrics", tags=["Monitoring"])
+async def metrics(session: AsyncSession = Depends(get_db)):
+    """Aggregate payout metrics for the monitoring dashboard."""
+    return await get_payout_metrics(session)
 
 
 # =============================================

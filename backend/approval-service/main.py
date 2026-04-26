@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import init_db, get_db
-from crud import list_records, get_record, get_record_by_expense, make_decision
+from crud import list_records, get_record, get_record_by_expense, make_decision, get_approval_metrics
 from schemas import ApprovalResponse, DecisionRequest
 from rest_client import notify_budget_service, notify_request_service
 
@@ -91,6 +91,16 @@ def _record_to_response(record) -> dict:
 @app.get("/health", tags=["Health"])
 async def health_check():
     return {"status": "healthy", "service": "approval-service", "grpc_port": 50051}
+
+
+# =============================================
+# Metrics Endpoint (Monitoring)
+# =============================================
+
+@app.get("/metrics", tags=["Monitoring"])
+async def metrics(session: AsyncSession = Depends(get_db)):
+    """Aggregate approval metrics for the monitoring dashboard."""
+    return await get_approval_metrics(session)
 
 
 # =============================================

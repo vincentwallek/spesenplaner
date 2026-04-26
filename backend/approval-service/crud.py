@@ -5,7 +5,7 @@ Approval Service — CRUD Operations.
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import ApprovalRecord
@@ -76,4 +76,69 @@ async def make_decision(
     await session.refresh(record)
     return record
 
+
+async def get_approval_metrics(session: AsyncSession) -> dict:
+    """Aggregate approval metrics for monitoring dashboard."""
+    # Total records
+    total_result = await session.execute(select(func.count(ApprovalRecord.id)))
+    total_count = total_result.scalar() or 0
+
+    # Decision breakdown
+    decision_result = await session.execute(
+        select(ApprovalRecord.decision, func.count(ApprovalRecord.id))
+        .group_by(ApprovalRecord.decision)
+    )
+    decision_counts = {}
+    for row in decision_result.all():
+        key = row[0] or "PENDING"
+        decision_counts[key] = row[1]
+
+    approved = decision_counts.get("APPROVED", 0)
+    rejected = decision_counts.get("REJECTED", 0)
+    needs_revision = decision_counts.get("NEEDS_REVISION", 0)
+    pending = decision_counts.get("PENDING", 0)
+    decided_total = approved + rejected + needs_revision
+
+    approval_rate = round((approved / decided_total * 100), 1) if decided_total > 0 else 0.0
+
+    # Total volume approved
+    vol_result = await session.execute(
+        select(func.sum(ApprovalRecord.original_amount))
+        .where(ApprovalRecord.decision == "APPROVED")
+    )
+    approved_volume = round(vol_result.scalar() or 0.0, 2)
+
+    # Average processing time (decided_at - created_at) in hours
+    decided_records = await session.execute(
+        select(ApprovalRecord)
+        .where(ApprovalRecord.decided_at.isnot(None))
+    )
+    processing_times = []
+    for r in decided_records.scalars().all():
+        if r.decided_at and r.created_at:
+            delta = (r.decided_at - r.created_at).total_seconds() / 3600
+            processing_times.append(delta)
+    avg_processing_hours = round(sum(processing_times) / len(processing_times), 2) if processing_times else 0.0
+
+    # Decisions per reviewer
+    reviewer_result = await session.execute(
+        select(ApprovalRecord.decided_by, func.count(ApprovalRecord.id))
+        .where(ApprovalRecord.decided_by.isnot(None))
+        .group_by(ApprovalRecord.decided_by)
+        .order_by(func.count(ApprovalRecord.id).desc())
+        .limit(10)
+    )
+    reviewers = [
+        {"reviewer": r[0], "count": r[1]}
+        for r in reviewer_result.all()
+    ]
+
+    return {
+        "total_count": total_count,
+        "decision_counts": decision_counts,
+        "approval_rate": approval_rate,
+        "approved_volume": approved_volume,
+        "average_processing_hours": avg_processing_hours,
+        "reviewers": reviewers,
+    }
 

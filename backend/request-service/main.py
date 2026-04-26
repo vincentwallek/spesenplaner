@@ -21,6 +21,7 @@ from crud import (
     delete_expense,
     update_expense_status,
     can_access_expense,
+    get_expense_metrics,
 )
 from schemas import (
     ExpenseCreate,
@@ -81,6 +82,16 @@ def _expense_to_response(expense) -> dict:
 async def health_check():
     """Health check for Kubernetes probes."""
     return {"status": "healthy", "service": "request-service"}
+
+
+# =============================================
+# Metrics Endpoint (Monitoring)
+# =============================================
+
+@app.get("/metrics", tags=["Monitoring"])
+async def metrics(session: AsyncSession = Depends(get_db)):
+    """Aggregate expense metrics for the monitoring dashboard."""
+    return await get_expense_metrics(session)
 
 
 # =============================================

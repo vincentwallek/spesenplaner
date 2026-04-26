@@ -41,6 +41,11 @@ export const routes: Routes = [
         loadComponent: () =>
           import('./components/user-management/user-management.component').then((m) => m.UserManagementComponent),
       },
+      {
+        path: 'monitoring',
+        loadComponent: () =>
+          import('./components/monitoring-dashboard/monitoring-dashboard.component').then((m) => m.MonitoringDashboardComponent),
+      },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
     ],
   },

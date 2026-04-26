@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from database import init_db, get_db
-from crud import check_budget, get_check, get_check_by_expense, list_checks, get_budget_summary
+from crud import check_budget, get_check, get_check_by_expense, list_checks, get_budget_summary, get_budget_metrics
 from schemas import BudgetCheckRequest, BudgetCheckResponse
 from kafka_producer import start_producer, stop_producer, publish_payout_event
 
@@ -87,6 +87,16 @@ async def _notify_request_service(expense_id: str, status: str):
 @app.get("/health", tags=["Health"])
 async def health_check():
     return {"status": "healthy", "service": "budget-service"}
+
+
+# =============================================
+# Metrics Endpoint (Monitoring)
+# =============================================
+
+@app.get("/metrics", tags=["Monitoring"])
+async def metrics(session: AsyncSession = Depends(get_db)):
+    """Aggregate budget metrics for the monitoring dashboard."""
+    return await get_budget_metrics(session)
 
 
 # =============================================

@@ -5,7 +5,7 @@ Budget Service — CRUD Operations.
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import BudgetCheck
@@ -95,3 +95,47 @@ async def get_budget_summary(session: AsyncSession) -> dict:
         "remaining": TOTAL_BUDGET - spent,
         "confirmed_count": len(confirmed),
     }
+
+
+async def get_budget_metrics(session: AsyncSession) -> dict:
+    """Aggregate budget metrics for monitoring dashboard."""
+    # Total checks
+    total_result = await session.execute(select(func.count(BudgetCheck.id)))
+    total_count = total_result.scalar() or 0
+
+    # Result breakdown
+    result_data = await session.execute(
+        select(BudgetCheck.result, func.count(BudgetCheck.id))
+        .group_by(BudgetCheck.result)
+    )
+    result_counts = {row[0]: row[1] for row in result_data.all()}
+
+    # Budget summary
+    confirmed_result = await session.execute(
+        select(BudgetCheck).where(BudgetCheck.result == "BUDGET_CONFIRMED")
+    )
+    confirmed = confirmed_result.scalars().all()
+    spent = sum(c.amount for c in confirmed)
+
+    # Total volume checked
+    vol_result = await session.execute(
+        select(func.sum(BudgetCheck.amount))
+    )
+    total_volume_checked = round(vol_result.scalar() or 0.0, 2)
+
+    # Average check amount
+    avg_result = await session.execute(
+        select(func.avg(BudgetCheck.amount))
+    )
+    avg_check_amount = round(avg_result.scalar() or 0.0, 2)
+
+    return {
+        "total_count": total_count,
+        "result_counts": result_counts,
+        "total_budget": TOTAL_BUDGET,
+        "spent": round(spent, 2),
+        "remaining": round(TOTAL_BUDGET - spent, 2),
+        "total_volume_checked": total_volume_checked,
+        "average_check_amount": avg_check_amount,
+    }
+

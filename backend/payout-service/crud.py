@@ -6,7 +6,7 @@ import random
 from datetime import datetime, timezone
 from typing import Optional, List
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models import PayoutRecord
@@ -81,3 +81,56 @@ async def list_records(session: AsyncSession) -> List[PayoutRecord]:
         select(PayoutRecord).order_by(PayoutRecord.created_at.desc())
     )
     return list(result.scalars().all())
+
+
+async def get_payout_metrics(session: AsyncSession) -> dict:
+    """Aggregate payout metrics for monitoring dashboard."""
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+
+    # Total records
+    total_result = await session.execute(select(func.count(PayoutRecord.id)))
+    total_count = total_result.scalar() or 0
+
+    # Status breakdown
+    status_result = await session.execute(
+        select(PayoutRecord.status, func.count(PayoutRecord.id))
+        .group_by(PayoutRecord.status)
+    )
+    status_counts = {row[0]: row[1] for row in status_result.all()}
+
+    # Total volume paid
+    paid_vol = await session.execute(
+        select(func.sum(PayoutRecord.amount))
+        .where(PayoutRecord.status == "PAID")
+    )
+    total_paid = round(paid_vol.scalar() or 0.0, 2)
+
+    # Total volume failed
+    failed_vol = await session.execute(
+        select(func.sum(PayoutRecord.amount))
+        .where(PayoutRecord.status == "PAYOUT_FAILED")
+    )
+    total_failed = round(failed_vol.scalar() or 0.0, 2)
+
+    # Today's payouts
+    today_result = await session.execute(
+        select(func.count(PayoutRecord.id))
+        .where(PayoutRecord.created_at >= today_start)
+    )
+    today_count = today_result.scalar() or 0
+
+    # Success rate
+    paid = status_counts.get("PAID", 0)
+    failed = status_counts.get("PAYOUT_FAILED", 0)
+    success_rate = round((paid / (paid + failed) * 100), 1) if (paid + failed) > 0 else 0.0
+
+    return {
+        "total_count": total_count,
+        "status_counts": status_counts,
+        "total_paid": total_paid,
+        "total_failed": total_failed,
+        "today_count": today_count,
+        "success_rate": success_rate,
+    }
+
