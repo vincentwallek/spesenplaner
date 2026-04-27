@@ -34,6 +34,7 @@ export interface AuditLog {
   action: string;
   details: string;
   user: string;
+  currency?: string;
 }
 
 export interface MonitoringLogs {

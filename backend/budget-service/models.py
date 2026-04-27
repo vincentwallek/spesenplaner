@@ -16,6 +16,7 @@ class BudgetCheck(Base):
     expense_id = Column(String, nullable=False, unique=True, index=True)
     title = Column(String(200), nullable=True)
     amount = Column(Float, nullable=False)
+    amount_eur = Column(Float, nullable=False, default=0.0)  # EUR-converted amount for budget calc
     currency = Column(String(3), default="EUR")
     budget_available = Column(Float, default=10000.0)
     result = Column(String(25), nullable=True)  # BUDGET_CONFIRMED, BUDGET_DENIED

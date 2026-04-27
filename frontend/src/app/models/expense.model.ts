@@ -16,6 +16,7 @@ export interface Expense {
   currency: string;
   status: string;
   category?: string;
+  manager_message?: string;
   created_by: string;
   created_at?: string;
   updated_at?: string;

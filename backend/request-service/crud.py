@@ -12,6 +12,21 @@ from models import Expense
 from schemas import ExpenseCreate, ExpenseUpdate
 
 
+# Static exchange rates to EUR (must match budget-service rates)
+EXCHANGE_RATES_TO_EUR: dict[str, float] = {
+    "EUR": 1.0,
+    "USD": 0.92,
+    "CHF": 1.05,
+    "GBP": 1.17,
+}
+
+
+def convert_to_eur(amount: float, currency: str) -> float:
+    """Convert an amount to EUR using static exchange rates."""
+    rate = EXCHANGE_RATES_TO_EUR.get(currency.upper(), 1.0)
+    return round(amount * rate, 2)
+
+
 async def create_expense(session: AsyncSession, data: ExpenseCreate, created_by: str) -> Expense:
     """Create a new expense in DRAFT status."""
     expense = Expense(
@@ -126,13 +141,11 @@ async def get_expense_metrics(session: AsyncSession) -> dict:
     )
     status_counts = {row[0]: row[1] for row in status_result.all()}
 
-    # Total and average amount
-    amount_result = await session.execute(
-        select(func.sum(Expense.amount), func.avg(Expense.amount))
-    )
-    row = amount_result.one()
-    total_amount = round(row[0] or 0.0, 2)
-    avg_amount = round(row[1] or 0.0, 2)
+    # Total and average amount (converted to EUR for accurate aggregation)
+    all_expenses_result = await session.execute(select(Expense))
+    all_expenses = list(all_expenses_result.scalars().all())
+    total_amount_eur = round(sum(convert_to_eur(e.amount, e.currency) for e in all_expenses), 2)
+    avg_amount_eur = round(total_amount_eur / len(all_expenses), 2) if all_expenses else 0.0
 
     # Today's count
     today_result = await session.execute(
@@ -148,17 +161,17 @@ async def get_expense_metrics(session: AsyncSession) -> dict:
     )
     week_count = week_result.scalar() or 0
 
-    # Top categories
-    cat_result = await session.execute(
-        select(Expense.category, func.count(Expense.id), func.sum(Expense.amount))
-        .where(Expense.category.isnot(None))
-        .group_by(Expense.category)
-        .order_by(func.count(Expense.id).desc())
-        .limit(5)
-    )
+    # Top categories (with EUR-converted totals)
+    cat_expenses: dict[str, dict] = {}
+    for e in all_expenses:
+        cat = e.category or "Sonstige"
+        if cat not in cat_expenses:
+            cat_expenses[cat] = {"count": 0, "total_amount": 0.0}
+        cat_expenses[cat]["count"] += 1
+        cat_expenses[cat]["total_amount"] += convert_to_eur(e.amount, e.currency)
     top_categories = [
-        {"category": r[0] or "Sonstige", "count": r[1], "total_amount": round(r[2] or 0, 2)}
-        for r in cat_result.all()
+        {"category": k, "count": v["count"], "total_amount": round(v["total_amount"], 2)}
+        for k, v in sorted(cat_expenses.items(), key=lambda x: x[1]["count"], reverse=True)[:5]
     ]
 
     # Unique users
@@ -189,8 +202,8 @@ async def get_expense_metrics(session: AsyncSession) -> dict:
     return {
         "total_count": total_count,
         "status_counts": status_counts,
-        "total_amount": total_amount,
-        "average_amount": avg_amount,
+        "total_amount": total_amount_eur,
+        "average_amount": avg_amount_eur,
         "today_count": today_count,
         "week_count": week_count,
         "top_categories": top_categories,

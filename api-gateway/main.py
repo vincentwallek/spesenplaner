@@ -309,6 +309,7 @@ async def monitoring_logs(
                     "action": f"Expense {exp.get('status', 'UNKNOWN')}",
                     "details": f"{exp.get('title', '?')} — {exp.get('amount', 0)} {exp.get('currency', 'EUR')}",
                     "user": exp.get("created_by", "unknown"),
+                    "currency": exp.get("currency", "EUR"),
                 })
     except Exception:
         pass

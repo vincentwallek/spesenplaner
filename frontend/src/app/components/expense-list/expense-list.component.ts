@@ -32,6 +32,21 @@ import { AuthService } from '../../services/auth.service';
         </div>
       }
 
+      @if (getMessageNotifications().length > 0) {
+        <div class="glass-card mb-3" style="background: rgba(59, 130, 246, 0.1); border-color: rgba(59, 130, 246, 0.3);">
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <div style="font-size: 2rem;">📩</div>
+            <div>
+              <h3 style="color: #2563eb; margin-bottom: 0.25rem;">Neue Nachricht(en) vom Manager</h3>
+              <p class="text-sm text-secondary">
+                Du hast <strong>{{ getMessageNotifications().length }}</strong> Antrag/Anträge mit einer Nachricht.
+                Klicke auf Details, um die Nachricht zu lesen.
+              </p>
+            </div>
+          </div>
+        </div>
+      }
+
       <div class="glass-card mb-3">
         <div class="filter-row">
           <label class="text-sm text-secondary">Status-Filter:</label>
@@ -57,7 +72,7 @@ import { AuthService } from '../../services/auth.service';
                   <span class="legend-color" [style.background]="item.value.color"></span>
                   <div class="legend-text">
                     <span class="legend-label">{{ getLabel(item.key) }}</span>
-                    <span class="legend-value">{{ item.value.amount | number:'1.2-2' }} € ({{ item.value.count }})</span>
+                    <span class="legend-value">{{ item.value.amount | number:'1.2-2' }} {{ item.value.currency || '€' }} ({{ item.value.count }})</span>
                   </div>
                 </div>
               }
@@ -133,7 +148,7 @@ export class ExpenseListComponent implements OnInit {
   getCss(s: string) { return STATUS_CSS[s] || 'badge-draft'; }
 
   getChartStats() {
-    const stats: Record<string, { amount: number, count: number, color: string }> = {};
+    const stats: Record<string, { amount: number, count: number, color: string, currency: string }> = {};
     const colors: Record<string, string> = {
       'APPROVED': '#10b981', // success
       'PAID': '#3b82f6', // info
@@ -148,7 +163,7 @@ export class ExpenseListComponent implements OnInit {
 
     let total = 0;
     for (const e of this.expenses()) {
-      if (!stats[e.status]) stats[e.status] = { amount: 0, count: 0, color: colors[e.status] || '#ccc' };
+      if (!stats[e.status]) stats[e.status] = { amount: 0, count: 0, color: colors[e.status] || '#ccc', currency: e.currency };
       stats[e.status].amount += e.amount;
       stats[e.status].count++;
       total += e.amount;
@@ -184,5 +199,10 @@ export class ExpenseListComponent implements OnInit {
   getNeedsRevisionExpenses(): Expense[] {
     const username = this.auth.currentUser()?.username;
     return this.expenses().filter(e => e.status === 'NEEDS_REVISION' && e.created_by === username);
+  }
+
+  getMessageNotifications(): Expense[] {
+    const username = this.auth.currentUser()?.username;
+    return this.expenses().filter(e => e.manager_message && e.created_by === username && e.status === 'BUDGET_DENIED');
   }
 }

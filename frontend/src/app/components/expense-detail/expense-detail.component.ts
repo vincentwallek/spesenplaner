@@ -75,6 +75,12 @@ import { AuthService } from '../../services/auth.service';
                 <p class="mt-1 font-semibold">{{ approvalReason() }}</p>
               </div>
             }
+            @if (expense()!.manager_message && isCreator()) {
+              <div class="mt-2 status-note status-note-info">
+                <span class="info-label">📩 Nachricht vom Manager</span>
+                <p class="mt-1 font-semibold">{{ expense()!.manager_message }}</p>
+              </div>
+            }
           </div>
 
           <!-- Actions Card (HATEOAS) -->
@@ -106,6 +112,15 @@ import { AuthService } from '../../services/auth.service';
               <div class="status-note status-note-warning">
                 Budgetprüfung abgeschlossen: nicht ausreichend Budget verfügbar.
               </div>
+              @if (canManageApproval() || auth.currentUser()?.role === 'manager' || auth.currentUser()?.role === 'admin') {
+                <div class="manager-message-box">
+                  <span class="info-label">📩 Nachricht an {{ expense()!.created_by }} verfassen</span>
+                  <textarea class="form-control mt-1" [ngModel]="managerMessage()" (ngModelChange)="managerMessage.set($event)" rows="3" placeholder="Nachricht eingeben..."></textarea>
+                  <button class="btn btn-warning w-full mt-1" (click)="sendMessage()" [disabled]="actionLoading() || !managerMessage()">
+                    Nachricht senden
+                  </button>
+                </div>
+              }
             }
             <p class="text-sm text-muted mb-2">Verfügbare Aktionen basierend auf dem aktuellen Status:</p>
             <div class="actions-list">
@@ -127,9 +142,18 @@ import { AuthService } from '../../services/auth.service';
                 </div>
               }
               @if (expense()!._links['update'] && isCreator()) {
-                <a [routerLink]="['/expenses', expense()!.id, 'edit']" class="btn btn-secondary w-full" id="btn-edit">Bearbeiten</a>
+                @if (expense()!.status === 'NEEDS_REVISION') {
+                  <div class="revision-hint">
+                    <span>⚠️ Bitte überarbeite den Antrag bevor du ihn erneut einreichst.</span>
+                  </div>
+                  <a [routerLink]="['/expenses', expense()!.id, 'edit']" class="btn btn-revision-warning w-full" id="btn-edit">
+                    ⚠ Jetzt überarbeiten
+                  </a>
+                } @else {
+                  <a [routerLink]="['/expenses', expense()!.id, 'edit']" class="btn btn-secondary w-full" id="btn-edit">Bearbeiten</a>
+                }
               }
-              @if (expense()!._links['submit'] && isCreator()) {
+              @if (expense()!._links['submit'] && isCreator() && expense()!.status !== 'NEEDS_REVISION') {
                 <button class="btn btn-primary w-full" (click)="submitExpense()" [disabled]="actionLoading()" id="btn-submit">Einreichen</button>
               }
               @if (expense()!._links['cancel'] && isCreator()) {
@@ -215,6 +239,44 @@ import { AuthService } from '../../services/auth.service';
     .step-content { text-align:center; }
     .step-label { font-size:0.75rem; font-weight:600; display:block; }
     .step-desc { font-size:0.625rem; display:block; }
+    /* Fix #3: Pulsing revision warning button */
+    .btn-revision-warning {
+      background: linear-gradient(135deg, #f97316, #ea580c);
+      color: white;
+      font-weight: 700;
+      border: 2px solid #c2410c;
+      animation: pulse-btn 1.5s ease-in-out infinite;
+      box-shadow: 0 0 16px rgba(249, 115, 22, 0.4);
+      text-align: center;
+      text-decoration: none;
+    }
+    .btn-revision-warning:hover {
+      background: linear-gradient(135deg, #ea580c, #c2410c);
+      box-shadow: 0 0 24px rgba(249, 115, 22, 0.6);
+      transform: translateY(-1px);
+    }
+    @keyframes pulse-btn {
+      0%, 100% { box-shadow: 0 0 12px rgba(249, 115, 22, 0.3); }
+      50% { box-shadow: 0 0 24px rgba(249, 115, 22, 0.6); }
+    }
+    .revision-hint {
+      padding: 0.625rem 0.75rem;
+      background: rgba(249, 115, 22, 0.1);
+      border: 1px solid rgba(249, 115, 22, 0.3);
+      border-radius: var(--border-radius-sm);
+      color: #ea580c;
+      font-size: 0.8125rem;
+      font-weight: 500;
+      margin-bottom: 0.5rem;
+    }
+    /* Fix #4: Manager message box */
+    .manager-message-box {
+      padding: 0.75rem;
+      background: rgba(245, 158, 11, 0.05);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      border-radius: var(--border-radius-sm);
+      margin-top: 0.5rem;
+    }
   `],
 })
 export class ExpenseDetailComponent implements OnInit {
@@ -227,6 +289,7 @@ export class ExpenseDetailComponent implements OnInit {
   approvalDecisionAt = signal('');
   approvalReason = signal('');
   decisionReason = signal('');
+  managerMessage = signal('');
 
   baseStatusSteps = [
     { key: 'DRAFT', label: 'Entwurf', desc: 'Erstellt' },
@@ -282,6 +345,7 @@ export class ExpenseDetailComponent implements OnInit {
           this.expense.set(e);
           this.loading.set(false);
           this.loadApprovalContext();
+          this.prepareManagerMessage();
         },
         error: () => this.router.navigate(['/expenses']),
       });
@@ -458,5 +522,39 @@ export class ExpenseDetailComponent implements OnInit {
   private showMsg(msg: string) {
     this.actionMsg.set(msg);
     setTimeout(() => this.actionMsg.set(''), 4000);
+  }
+
+  /** Pre-fill manager message template for BUDGET_DENIED expenses */
+  private prepareManagerMessage() {
+    const e = this.expense();
+    if (!e || e.status !== 'BUDGET_DENIED') return;
+    if (e.manager_message) {
+      // Already sent — show existing message
+      this.managerMessage.set(e.manager_message);
+      return;
+    }
+    // Pre-fill template
+    this.managerMessage.set(
+      `Sehr geehrte/r ${e.created_by},\n\nleider wurde Ihr Antrag "${e.title}" über ${e.amount.toFixed(2)} ${e.currency} abgelehnt, da das verfügbare Budget nicht ausreicht.\n\nBitte wenden Sie sich bei Fragen an Ihren Vorgesetzten.\n\nMit freundlichen Grüßen`
+    );
+  }
+
+  /** Send the manager message to the expense creator */
+  sendMessage() {
+    const e = this.expense();
+    const msg = this.managerMessage();
+    if (!e || !msg) return;
+    this.actionLoading.set(true);
+    this.svc.sendManagerMessage(e.id, msg).subscribe({
+      next: (updated) => {
+        this.expense.set(updated);
+        this.actionLoading.set(false);
+        this.showMsg('Nachricht wurde gesendet.');
+      },
+      error: () => {
+        this.actionLoading.set(false);
+        this.showMsg('Nachricht konnte nicht gesendet werden.');
+      },
+    });
   }
 }

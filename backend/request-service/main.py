@@ -66,6 +66,7 @@ def _expense_to_response(expense) -> dict:
         "currency": expense.currency,
         "status": expense.status,
         "category": expense.category,
+        "manager_message": expense.manager_message,
         "created_by": expense.created_by,
         "created_at": expense.created_at.isoformat() if expense.created_at else None,
         "updated_at": expense.updated_at.isoformat() if expense.updated_at else None,
@@ -273,6 +274,40 @@ async def cancel_expense(
         raise HTTPException(status_code=400, detail="Can only cancel SUBMITTED expenses")
 
     expense = await update_expense_status(session, expense_id, "DRAFT")
+    return _expense_to_response(expense)
+
+
+# =============================================
+# Manager Message Endpoint
+# =============================================
+
+@app.put("/expenses/{expense_id}/message", tags=["Workflow"])
+async def send_manager_message(
+    expense_id: str,
+    body: dict,
+    session: AsyncSession = Depends(get_db),
+    x_user_name: Optional[str] = Header(default=None),
+    x_user_role: Optional[str] = Header(default="user"),
+):
+    """
+    Send a message from a manager/admin to the expense creator.
+    Typically used to inform about budget denial reasons.
+    """
+    normalized_role = (x_user_role or "user").lower()
+    if normalized_role not in ("manager", "admin"):
+        raise HTTPException(status_code=403, detail="Only managers and admins can send messages")
+
+    message = body.get("message", "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+    expense = await get_expense(session, expense_id)
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    expense.manager_message = message
+    await session.commit()
+    await session.refresh(expense)
     return _expense_to_response(expense)
 
 

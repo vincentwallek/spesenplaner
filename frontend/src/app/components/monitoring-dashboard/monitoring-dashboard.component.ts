@@ -112,10 +112,10 @@ export class MonitoringDashboardComponent implements OnInit, OnDestroy {
     return labels[status] || status;
   }
 
-  formatCurrency(value: number): string {
+  formatCurrency(value: number, currency: string = 'EUR'): string {
     return new Intl.NumberFormat('de-DE', {
       style: 'currency',
-      currency: 'EUR',
+      currency: currency,
     }).format(value);
   }
 

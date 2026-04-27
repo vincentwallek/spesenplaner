@@ -24,6 +24,7 @@ class Expense(Base):
     # Possible statuses: DRAFT, SUBMITTED, APPROVED, REJECTED,
     #                    BUDGET_CONFIRMED, BUDGET_DENIED, PAID, PAYOUT_FAILED
     category = Column(String(50), nullable=True)  # e.g., travel, food, hotel
+    manager_message = Column(Text, nullable=True)  # Message from manager to user (e.g. budget denial info)
     created_by = Column(String(100), nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc),

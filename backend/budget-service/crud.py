@@ -14,6 +14,20 @@ from models import BudgetCheck
 # Simulated total budget pool
 TOTAL_BUDGET = 10000.0
 
+# Static exchange rates to EUR (approximate)
+EXCHANGE_RATES_TO_EUR: dict[str, float] = {
+    "EUR": 1.0,
+    "USD": 0.92,
+    "CHF": 1.05,
+    "GBP": 1.17,
+}
+
+
+def convert_to_eur(amount: float, currency: str) -> float:
+    """Convert an amount in a given currency to EUR using static rates."""
+    rate = EXCHANGE_RATES_TO_EUR.get(currency.upper(), 1.0)
+    return round(amount * rate, 2)
+
 
 async def check_budget(
     session: AsyncSession,
@@ -25,13 +39,17 @@ async def check_budget(
     """
     Check if there is sufficient budget for the expense.
     Simple simulation: budget starts at 10,000 EUR, each confirmed expense reduces it.
+    All amounts are converted to EUR for budget calculation.
     """
-    # Calculate remaining budget
+    # Convert amount to EUR for budget comparison
+    amount_eur = convert_to_eur(amount, currency)
+
+    # Calculate remaining budget (using EUR-converted amounts)
     result = await session.execute(
         select(BudgetCheck).where(BudgetCheck.result == "BUDGET_CONFIRMED")
     )
     confirmed = result.scalars().all()
-    spent = sum(c.amount for c in confirmed)
+    spent = sum(c.amount_eur for c in confirmed)
     remaining = TOTAL_BUDGET - spent
 
     # Create budget check record
@@ -39,12 +57,13 @@ async def check_budget(
         expense_id=expense_id,
         title=title,
         amount=amount,
+        amount_eur=amount_eur,
         currency=currency,
         budget_available=remaining,
         checked_at=datetime.now(timezone.utc),
     )
 
-    if amount <= remaining:
+    if amount_eur <= remaining:
         record.result = "BUDGET_CONFIRMED"
     else:
         record.result = "BUDGET_DENIED"
@@ -88,7 +107,7 @@ async def get_budget_summary(session: AsyncSession) -> dict:
         select(BudgetCheck).where(BudgetCheck.result == "BUDGET_CONFIRMED")
     )
     confirmed = result.scalars().all()
-    spent = sum(c.amount for c in confirmed)
+    spent = sum(c.amount_eur for c in confirmed)
     return {
         "total_budget": TOTAL_BUDGET,
         "spent": spent,
@@ -115,7 +134,7 @@ async def get_budget_metrics(session: AsyncSession) -> dict:
         select(BudgetCheck).where(BudgetCheck.result == "BUDGET_CONFIRMED")
     )
     confirmed = confirmed_result.scalars().all()
-    spent = sum(c.amount for c in confirmed)
+    spent = sum(c.amount_eur for c in confirmed)
 
     # Total volume checked
     vol_result = await session.execute(

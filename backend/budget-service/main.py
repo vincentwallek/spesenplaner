@@ -58,6 +58,7 @@ def _check_to_response(record) -> dict:
         "expense_id": record.expense_id,
         "title": record.title,
         "amount": record.amount,
+        "amount_eur": record.amount_eur,
         "currency": record.currency,
         "budget_available": record.budget_available,
         "result": record.result,

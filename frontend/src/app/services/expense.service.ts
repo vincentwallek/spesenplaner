@@ -80,6 +80,11 @@ export class ExpenseService {
     return this.http.get<any>(`${API_URL}/budgets/expense/${expenseId}`);
   }
 
+  /** Send a manager message for an expense (e.g. budget denial info) */
+  sendManagerMessage(expenseId: string, message: string): Observable<Expense> {
+    return this.http.put<Expense>(`${API_URL}/expenses/${expenseId}/message`, { message });
+  }
+
   /**
    * Follow a HATEOAS link.
    * This is the key method for navigating the API via hypermedia.

@@ -55,7 +55,7 @@
       <div class="kpi-card accent-purple">
         <div class="kpi-label">Gesamtvolumen</div>
         <div class="kpi-value">{{ formatCurrency(totalAmount()) }}</div>
-        <div class="kpi-sub">Ø {{ formatCurrency(avgAmount()) }} pro Antrag</div>
+        <div class="kpi-sub">Ø {{ formatCurrency(avgAmount()) }} pro Antrag (in EUR umgerechnet)</div>
       </div>
 
       <div class="kpi-card accent-teal">
@@ -115,7 +115,7 @@
             ></div>
           </div>
           <div class="gauge-labels">
-            <span>{{ formatCurrency(budgetSpent()) }} ausgegeben</span>
+            <span>{{ formatCurrency(budgetSpent()) }} ausgegeben (EUR)</span>
             <span>{{ formatCurrency(budgetRemaining()) }} verbleibend</span>
           </div>
         </div>
@@ -201,7 +201,7 @@
                     <td>{{ formatTime(log.timestamp) }}</td>
                     <td><strong>{{ log.user }}</strong></td>
                     <td><span class="log-action badge">{{ log.action }}</span></td>
-                    <td>{{ log.details }}</td>
+                    <td>{{ log.details }} {{ log.currency && log.currency !== 'EUR' ? '(' + log.currency + ')' : '' }}</td>
                   </tr>
                 }
               </tbody>

@@ -34,6 +34,14 @@ class ApprovalServiceServicer(approval_pb2_grpc.ApprovalServiceServicer):
                 existing = await get_record_by_expense(session, request.expense_id)
                 if existing:
                     record = existing
+                    # Reset decision if previously NEEDS_REVISION so manager can decide again
+                    if record.decision == "NEEDS_REVISION":
+                        record.decision = None
+                        record.reason = None
+                        record.decided_by = "auto-approver"
+                        record.decided_at = None
+                        await session.commit()
+                        await session.refresh(record)
                 else:
                     record = await create_approval_record(
                         session=session,
