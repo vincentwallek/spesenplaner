@@ -34,6 +34,8 @@ async def lifespan(app: FastAPI):
     """Initialize DB and start Kafka consumer as background task."""
     global _consumer_task
     await init_db()
+    from database import seed_data
+    await seed_data()
 
     # Start Kafka consumer as background task
     _consumer_task = asyncio.create_task(consume_payout_events())

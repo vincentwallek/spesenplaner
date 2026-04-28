@@ -36,6 +36,8 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Initialize database on startup."""
     await init_db()
+    from database import seed_data
+    await seed_data()
     yield
 
 

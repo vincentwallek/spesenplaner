@@ -28,6 +28,8 @@ REQUEST_SERVICE_URL = os.getenv("REQUEST_SERVICE_URL", "http://localhost:3001")
 async def lifespan(app: FastAPI):
     """Initialize DB and Kafka producer."""
     await init_db()
+    from database import seed_data
+    await seed_data()
     await start_producer()
     yield
     await stop_producer()

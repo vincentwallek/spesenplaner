@@ -31,6 +31,8 @@ async def lifespan(app: FastAPI):
     """Start gRPC server alongside FastAPI."""
     global grpc_server
     await init_db()
+    from database import seed_data
+    await seed_data()
 
     # Start gRPC server
     grpc_server = grpc.aio.server()

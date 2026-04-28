@@ -1,5 +1,5 @@
 import { Component, OnInit, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import { ExpenseService } from '../../services/expense.service';
 import { Expense, STATUS_LABELS, STATUS_CSS } from '../../models/expense.model';
@@ -61,7 +61,8 @@ import { AuthService } from '../../services/auth.service';
         </div>
       </div>
 
-      @if ((auth.currentUser()?.role === 'admin' || auth.currentUser()?.role === 'manager') && expenses().length > 0 && !statusFilter) {
+
+      @if (router.url.includes('dashboard') && (auth.currentUser()?.role === 'admin' || auth.currentUser()?.role === 'manager') && expenses().length > 0 && !statusFilter) {
         <div class="glass-card mb-3 chart-card">
           <h3 class="mb-3">Ausgaben-Übersicht</h3>
           <div class="chart-container">
@@ -80,6 +81,7 @@ import { AuthService } from '../../services/auth.service';
           </div>
         </div>
       }
+
       @if (loading()) {
         <div class="loading-overlay"><div class="spinner"></div><span>Lade...</span></div>
       } @else if (expenses().length === 0) {
@@ -126,6 +128,7 @@ import { AuthService } from '../../services/auth.service';
     .legend-text { display: flex; justify-content: space-between; flex-grow: 1; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 0.25rem; }
     .legend-label { font-size: 0.875rem; color: var(--color-text-secondary); }
     .legend-value { font-size: 0.875rem; font-weight: 600; color: var(--color-text-primary); }
+
   `],
 })
 export class ExpenseListComponent implements OnInit {
@@ -133,7 +136,7 @@ export class ExpenseListComponent implements OnInit {
   loading = signal(true);
   statusFilter = '';
 
-  constructor(private svc: ExpenseService, public auth: AuthService) {}
+  constructor(private svc: ExpenseService, public auth: AuthService, public router: Router) {}
   ngOnInit() { this.load(); }
 
   load() {
@@ -195,6 +198,7 @@ export class ExpenseListComponent implements OnInit {
     
     return gradient;
   }
+
 
   getNeedsRevisionExpenses(): Expense[] {
     const username = this.auth.currentUser()?.username;

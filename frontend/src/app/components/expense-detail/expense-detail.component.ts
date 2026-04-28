@@ -189,18 +189,7 @@ import { AuthService } from '../../services/auth.service';
           <div class="toast toast-info">{{ actionMsg() }}</div>
         }
 
-        <!-- HATEOAS Links Info -->
-        <div class="glass-card mt-3">
-          <h3 class="mb-2">Technische Details (HATEOAS)</h3>
-          <div class="links-grid">
-            @for (entry of expense()!._links | keyvalue; track entry.key) {
-              <div class="link-item">
-                <code class="link-rel">{{ entry.key }}</code>
-                <span class="text-muted text-sm">{{ entry.value.method }} {{ entry.value.href }}</span>
-              </div>
-            }
-          </div>
-        </div>
+
       }
     </div>
   `,
