@@ -34,19 +34,19 @@ Eine Full-Stack Microservice-Webanwendung zur Verwaltung des gesamten Lebenszykl
 
 | Route | Protokoll | Begründung |
 |---|---|---|
-| Frontend → API Gateway | REST | Browser-Standard |
-| request → approval | **gRPC** | Performantes binäres Protokoll |
-| approval → budget | **REST** | Direkte HTTP-Kette |
-| budget → payout | **Kafka** | Asynchrone Event-Entkopplung |
+| Frontend → API Gateway | REST | Industriestandard für Web-Clients |
+| request → approval | **gRPC** | Hochperformantes binäres Protokoll für interne Kommunikation |
+| approval → budget | **REST** | Synchrone Kommunikation für Validierungsketten |
+| budget → payout | **Kafka** | Asynchrone Event-Entkopplung für resiliente Auszahlungsprozesse |
 
 ### Microservice-Prinzipien
 
-- ✅ **Zustandslos** — Kein Session-State in Services
-- ✅ **Eigene Datenbank** — Jeder Service hat isolierte SQLite-DB
-- ✅ **Eigene Businesslogik** — Klar abgegrenzte Domänen
-- ✅ **HATEOAS** — Alle API-Responses enthalten Hypermedia-Links
-- ✅ **OAuth2/JWT** — Zentralisierte Authentifizierung am API Gateway
-- ✅ **Swagger/OpenAPI** — Automatische Doku unter `/docs`
+- **Zustandslosigkeit** — Die Services halten keinen Session-State.
+- **Isolierte Datenhaltung** — Jeder Service verfügt über eine eigene, isolierte SQLite-Datenbank.
+- **Domänentrennung** — Klare Abgrenzung der Businesslogik nach fachlichen Domänen.
+- **HATEOAS** — API-Antworten enthalten Hypermedia-Links zur Navigation.
+- **Zentrale Sicherheit** — OAuth2/JWT-basierte Authentifizierung und Autorisierung am API Gateway.
+- **Standardisierte Dokumentation** — Automatische API-Dokumentation via Swagger/OpenAPI.
 
 ## Technologie-Stack
 
@@ -55,35 +55,39 @@ Eine Full-Stack Microservice-Webanwendung zur Verwaltung des gesamten Lebenszykl
 | Frontend | Angular 18 (Standalone), TypeScript |
 | Backend | Python 3.12, FastAPI, Uvicorn |
 | Datenbank | SQLite (pro Service isoliert) |
-| Auth | OAuth2 Password Grant, JWT (python-jose) |
+| Sicherheit | OAuth2 Password Grant, JWT (python-jose) |
 | gRPC | grpcio, protobuf |
-| Kafka | Confluent Kafka, aiokafka |
-| Container | Docker, docker-compose |
+| Messaging | Confluent Kafka, aiokafka |
+| Containerisierung | Docker, Docker Compose |
 | Orchestrierung | Kubernetes, HPA Autoscaling |
-| API-Doku | Swagger UI (FastAPI automatisch) |
+| Dokumentation | Swagger UI (FastAPI Integration) |
 
-## Schnellstart (Lokal)
+## Schnellstart-Anleitung
 
 ### Voraussetzungen
-- Python 3.12+
-- Node.js 20+
-- Docker & Docker Compose
+- Python 3.12 oder höher
+- Node.js 20 oder höher
+- Docker & Docker Desktop (für Kubernetes)
 
-### Option 1: Docker Compose (empfohlen)
+### Option 1: Bereitstellung mittels Docker Compose (empfohlen)
+
+Verwenden Sie den folgenden Befehl, um das gesamte System inklusive Infrastruktur zu starten:
 
 ```bash
 docker-compose up --build
 ```
 
-Öffne: `http://localhost:8080` (Frontend) / `http://localhost:8000/docs` (API Gateway Swagger)
+Die Anwendung ist anschließend unter den folgenden URLs erreichbar:
+- Frontend: `http://localhost:8080`
+- API Gateway Dokumentation: `http://localhost:8000/docs`
 
-### Option 2: Manuell
+### Option 2: Manuelle Einrichtung für Entwicklungszwecke
 
 **Terminal 1 — API Gateway:**
 ```bash
 cd api-gateway
 python -m venv venv
-.\venv\Scripts\Activate.ps1   # Windows
+.\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 uvicorn main:app --reload --port 8000
 ```
@@ -94,7 +98,6 @@ cd backend/request-service
 python -m venv venv
 .\venv\Scripts\Activate.ps1
 pip install -r requirements.txt
-# gRPC Stubs generieren:
 python -m grpc_tools.protoc -I../../proto --python_out=. --grpc_python_out=. ../../proto/approval.proto
 uvicorn main:app --reload --port 3001
 ```
@@ -134,49 +137,101 @@ npm install
 ng serve --open
 ```
 
-### Demo-Zugangsdaten
+### Authentifizierung
+
+Für Testzwecke stehen folgende Konten zur Verfügung:
 
 | Benutzer | Passwort | Rolle |
 |---|---|---|
-| `demo` | `demo123` | user |
-| `manager` | `manager123` | manager |
-| `admin` | `admin123` | admin |
+| `demo` | `demo123` | Benutzer |
+| `manager` | `manager123` | Manager |
+| `admin` | `admin123` | Administrator |
 
-## Kubernetes Deployment
+## Kubernetes Deployment (Docker Desktop)
 
-```bash
-# Namespace erstellen
-kubectl apply -f k8s/namespace.yaml
+Die folgende Anleitung ist speziell für den Betrieb unter **Docker Desktop** optimiert. Da Docker Desktop die lokalen Images direkt mit dem integrierten Kubernetes-Cluster teilt, ist kein manueller "Image Load" erforderlich.
 
-# Infrastruktur (Kafka)
+### 1. Erstellung der Container-Images
+
+Führen Sie diese Befehle im Hauptverzeichnis des Projekts aus, um alle erforderlichen Images zu bauen:
+
+```powershell
+docker build -t rsp/api-gateway:latest -f api-gateway/Dockerfile .
+docker build -t rsp/request-service:latest -f backend/request-service/Dockerfile .
+docker build -t rsp/approval-service:latest -f backend/approval-service/Dockerfile .
+docker build -t rsp/budget-service:latest -f backend/budget-service/Dockerfile .
+docker build -t rsp/payout-service:latest -f backend/payout-service/Dockerfile .
+docker build -t rsp/frontend:latest -f frontend/Dockerfile .
+```
+
+### 2. Infrastruktur und Namespace vorbereiten
+
+Erstellen Sie den Namespace und rollen Sie die grundlegende Infrastruktur aus:
+
+```powershell
+# Namespace initialisieren
+kubectl create namespace reise-spesen-planer --dry-run=client -o yaml | kubectl apply -f -
+
+# Zookeeper und Kafka bereitstellen
+kubectl apply -f k8s/zookeeper/
 kubectl apply -f k8s/kafka/
+```
 
-# Services deployen
+### 3. Deployment der Microservices
+
+Rollen Sie die Anwendungsdienste aus:
+
+```powershell
 kubectl apply -f k8s/api-gateway/
 kubectl apply -f k8s/request-service/
 kubectl apply -f k8s/approval-service/
 kubectl apply -f k8s/budget-service/
 kubectl apply -f k8s/payout-service/
 kubectl apply -f k8s/frontend/
-
-# Ingress
-kubectl apply -f k8s/ingress.yaml
 ```
 
-### HPA Autoscaling Begründung
+### 4. Zugriff konfigurieren (Port-Forwarding)
 
-| Service | min | max | CPU% | Begründung |
+Um die Dienste lokal erreichbar zu machen, führen Sie folgende Befehle in jeweils separaten Terminal-Fenstern aus:
+
+```powershell
+# Frontend (Erreichbar unter http://localhost:8080)
+kubectl port-forward svc/frontend 8080:80 -n reise-spesen-planer
+
+# API Gateway (Erforderlich für die Kommunikation mit dem Backend)
+kubectl port-forward svc/api-gateway 8000:8000 -n reise-spesen-planer
+```
+
+### 5. Bereinigung der Ressourcen
+
+Zum Beenden der lokalen Umgebung und zum Entfernen der Ressourcen nutzen Sie folgende Befehle:
+
+#### Port-Forwarding beenden
+```powershell
+Stop-Process -Name kubectl -Force
+```
+
+#### Ressourcen entfernen (Optional)
+```powershell
+kubectl delete namespace reise-spesen-planer
+```
+
+## Analyse der HPA-Konfiguration
+
+Das System nutzt Horizontal Pod Autoscaling (HPA) zur Lastverteilung. Aufgrund der Verwendung von SQLite-Datenbanken in der aktuellen Entwicklungsphase sind einige Dienste auf eine Instanz limitiert, um die Datenintegrität zu gewährleisten.
+
+| Service | Min | Max | CPU Schwellenwert | Anmerkung |
 |---|---|---|---|---|
-| api-gateway | 1 | 1 | 70% | Hochverfügbar, 1 Instanz für SQLite-Konsistenz |
-| request-service | 1 | 1 | 60% | 1 Instanz für SQLite-Dateisperre |
-| approval-service | 1 | 1 | 70% | 1 Instanz für gRPC & SQLite |
-| budget-service | 1 | 1 | 70% | 1 Instanz für konsistente Finanzprüfung |
-| payout-service | 1 | 1 | 75% | Kafka-Consumer, 1 Instanz |
-| frontend | 1 | 3 | 80% | Nginx, statische Dateien |
+| api-gateway | 1 | 1 | 70% | Zentrale Instanz zur Wahrung der Konsistenz |
+| request-service | 1 | 1 | 60% | Limitierung durch Dateisperren in SQLite |
+| approval-service | 1 | 1 | 70% | Konsistente gRPC-Verarbeitung |
+| budget-service | 1 | 1 | 70% | Integrität der Finanzprüfungen |
+| payout-service | 1 | 1 | 75% | Singleton-Consumer für Kafka-Events |
+| frontend | 1 | 3 | 80% | Skalierbarer statischer Webserver |
 
-## API-Dokumentation
+## API-Endpunkte
 
-Jeder Service bietet automatische Swagger-UI:
+Jeder Microservice verfügt über eine integrierte Swagger-Oberfläche:
 
 | Service | Swagger URL |
 |---|---|
@@ -190,16 +245,16 @@ Jeder Service bietet automatische Swagger-UI:
 
 ```
 reise-spesen-planer/
-├── api-gateway/              # OAuth2, JWT, Reverse-Proxy
+├── api-gateway/              # Sicherheit und Routing
 ├── backend/
-│   ├── request-service/      # CRUD + gRPC Client
-│   ├── approval-service/     # gRPC Server + REST Client
-│   ├── budget-service/       # REST + Kafka Producer
-│   └── payout-service/       # Kafka Consumer + REST
-├── frontend/                 # Angular 18 SPA
-├── proto/                    # Shared gRPC Proto
-├── k8s/                      # Kubernetes Manifests
-├── docker-compose.yml
+│   ├── request-service/      # Antragsverwaltung
+│   ├── approval-service/     # Genehmigungsworkflow
+│   ├── budget-service/       # Budgetprüfung
+│   └── payout-service/       # Auszahlungsabwicklung
+├── frontend/                 # Angular Client
+├── proto/                    # Gemeinsame gRPC Definitionen
+├── k8s/                      # Kubernetes Konfigurationen
+├── docker-compose.yml        # Orchestrierung lokal
 ├── .gitignore
 └── README.md
 ```
