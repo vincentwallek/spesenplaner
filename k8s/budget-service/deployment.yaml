@@ -24,21 +24,21 @@ spec:
             - name: REQUEST_SERVICE_URL
               value: "http://request-service:3001"
             - name: KAFKA_BOOTSTRAP_SERVERS
-              value: "kafka:9092"
+              value: "kafka-service:9092"
             - name: KAFKA_PAYOUT_TOPIC
               value: "payout-requests"
             - name: DATABASE_URL
-              value: "sqlite+aiosqlite:///./budget.db"
+              value: "sqlite+aiosqlite:////tmp/budget.db"
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 400m
+              cpu: 150m
               memory: 256Mi
+            limits:
+              cpu: 600m
+              memory: 512Mi
           volumeMounts:
             - name: data
-              mountPath: /app
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /health
@@ -92,7 +92,7 @@ spec:
     kind: Deployment
     name: budget-service
   minReplicas: 1
-  maxReplicas: 4
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:

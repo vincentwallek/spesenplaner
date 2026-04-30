@@ -61,7 +61,7 @@ services:
       APPROVAL_SERVICE_URL: http://approval-service:3002
       BUDGET_SERVICE_URL: http://budget-service:3003
       PAYOUT_SERVICE_URL: http://payout-service:3004
-      SECRET_KEY: docker-compose-secret-key-change-in-production
+      SECRET_KEY: 6b985083e13b0e58617df056b6feb9c2c572e0d5a243ee917b7240cb40058e4e
       ALLOWED_ORIGINS: http://localhost:4200,http://localhost:8080
       DATABASE_URL: sqlite+aiosqlite:////tmp/gateway.db
     depends_on:

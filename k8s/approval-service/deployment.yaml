@@ -27,17 +27,17 @@ spec:
             - name: BUDGET_SERVICE_URL
               value: "http://budget-service:3003"
             - name: DATABASE_URL
-              value: "sqlite+aiosqlite:///./approval.db"
+              value: "sqlite+aiosqlite:////tmp/approval.db"
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 400m
+              cpu: 200m
               memory: 256Mi
+            limits:
+              cpu: 800m
+              memory: 512Mi
           volumeMounts:
             - name: data
-              mountPath: /app
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /health
@@ -95,7 +95,7 @@ spec:
     kind: Deployment
     name: approval-service
   minReplicas: 1
-  maxReplicas: 4
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:

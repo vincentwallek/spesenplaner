@@ -83,53 +83,62 @@ async def list_records(session: AsyncSession) -> List[PayoutRecord]:
     return list(result.scalars().all())
 
 
+# Static exchange rates to EUR (consistent across services)
+EXCHANGE_RATES_TO_EUR: dict[str, float] = {
+    "EUR": 1.0,
+    "USD": 0.92,
+    "CHF": 1.05,
+    "GBP": 1.17,
+}
+
+
+def convert_to_eur(amount: Optional[float], currency: Optional[str]) -> float:
+    """Convert an amount to EUR using static exchange rates."""
+    if amount is None:
+        return 0.0
+    curr = (currency or "EUR").upper().strip()
+    rate = EXCHANGE_RATES_TO_EUR.get(curr, 1.0)
+    return round(float(amount) * rate, 2)
+
+
 async def get_payout_metrics(session: AsyncSession) -> dict:
     """Aggregate payout metrics for monitoring dashboard."""
-    now = datetime.now(timezone.utc)
-    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    from datetime import datetime
 
-    # Total records
-    total_result = await session.execute(select(func.count(PayoutRecord.id)))
-    total_count = total_result.scalar() or 0
+    # Fetch all records for calculation
+    result = await session.execute(select(PayoutRecord))
+    all_records = list(result.scalars().all())
+    
+    total_count = len(all_records)
 
     # Status breakdown
-    status_result = await session.execute(
-        select(PayoutRecord.status, func.count(PayoutRecord.id))
-        .group_by(PayoutRecord.status)
-    )
-    status_counts = {row[0]: row[1] for row in status_result.all()}
+    status_counts = {}
+    for r in all_records:
+        status_counts[r.status] = status_counts.get(r.status, 0) + 1
 
-    # Total volume paid
-    paid_vol = await session.execute(
-        select(func.sum(PayoutRecord.amount))
-        .where(PayoutRecord.status == "PAID")
-    )
-    total_paid = round(paid_vol.scalar() or 0.0, 2)
+    # Total volume paid (converted to EUR)
+    paid_records = [r for r in all_records if r.status == "PAID"]
+    total_paid_eur = round(sum(convert_to_eur(r.amount, r.currency) for r in paid_records), 2)
 
-    # Total volume failed
-    failed_vol = await session.execute(
-        select(func.sum(PayoutRecord.amount))
-        .where(PayoutRecord.status == "PAYOUT_FAILED")
-    )
-    total_failed = round(failed_vol.scalar() or 0.0, 2)
+    # Total volume failed (converted to EUR)
+    failed_records = [r for r in all_records if r.status == "PAYOUT_FAILED"]
+    total_failed_eur = round(sum(convert_to_eur(r.amount, r.currency) for r in failed_records), 2)
 
-    # Today's payouts
-    today_result = await session.execute(
-        select(func.count(PayoutRecord.id))
-        .where(PayoutRecord.created_at >= today_start)
-    )
-    today_count = today_result.scalar() or 0
+    # Today's payouts (naive comparison)
+    now = datetime.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_count = sum(1 for r in all_records if r.created_at and r.created_at >= today_start)
 
     # Success rate
-    paid = status_counts.get("PAID", 0)
-    failed = status_counts.get("PAYOUT_FAILED", 0)
-    success_rate = round((paid / (paid + failed) * 100), 1) if (paid + failed) > 0 else 0.0
+    paid_count = status_counts.get("PAID", 0)
+    failed_count = status_counts.get("PAYOUT_FAILED", 0)
+    success_rate = round((paid_count / (paid_count + failed_count) * 100), 1) if (paid_count + failed_count) > 0 else 0.0
 
     return {
         "total_count": total_count,
         "status_counts": status_counts,
-        "total_paid": total_paid,
-        "total_failed": total_failed,
+        "total_paid": total_paid_eur,
+        "total_failed": total_failed_eur,
         "today_count": today_count,
         "success_rate": success_rate,
     }

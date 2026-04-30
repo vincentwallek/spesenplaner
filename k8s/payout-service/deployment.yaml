@@ -24,13 +24,13 @@ spec:
             - name: REQUEST_SERVICE_URL
               value: "http://request-service:3001"
             - name: KAFKA_BOOTSTRAP_SERVERS
-              value: "kafka:9092"
+              value: "kafka-service:9092"
             - name: KAFKA_PAYOUT_TOPIC
               value: "payout-requests"
             - name: KAFKA_GROUP_ID
               value: "payout-service-group"
             - name: DATABASE_URL
-              value: "sqlite+aiosqlite:///./payout.db"
+              value: "sqlite+aiosqlite:////tmp/payout.db"
           resources:
             requests:
               cpu: 50m
@@ -40,7 +40,7 @@ spec:
               memory: 256Mi
           volumeMounts:
             - name: data
-              mountPath: /app
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /health

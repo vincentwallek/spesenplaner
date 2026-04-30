@@ -36,13 +36,15 @@ spec:
                   key: secret-key
             - name: ALLOWED_ORIGINS
               value: "*"
+            - name: DATABASE_URL
+              value: "sqlite+aiosqlite:////tmp/gateway.db"
           resources:
             requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
+              cpu: 250m
               memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 512Mi
           readinessProbe:
             httpGet:
               path: /health
@@ -81,8 +83,8 @@ spec:
     apiVersion: apps/v1
     kind: Deployment
     name: api-gateway
-  minReplicas: 2
-  maxReplicas: 5
+  minReplicas: 1
+  maxReplicas: 1
   metrics:
     - type: Resource
       resource:

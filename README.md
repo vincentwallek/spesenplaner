@@ -167,11 +167,11 @@ kubectl apply -f k8s/ingress.yaml
 
 | Service | min | max | CPU% | Begründung |
 |---|---|---|---|---|
-| api-gateway | 2 | 5 | 70% | Hochverfügbar, alle Requests passieren hier |
-| request-service | 2 | 8 | 60% | Höchste Last (CRUD), frühes Scaling |
-| approval-service | 1 | 4 | 70% | Mittlere Last, gRPC effizient |
-| budget-service | 1 | 4 | 70% | Mittlere Last |
-| payout-service | 1 | 3 | 75% | Kafka-Consumer, asynchron |
+| api-gateway | 1 | 1 | 70% | Hochverfügbar, 1 Instanz für SQLite-Konsistenz |
+| request-service | 1 | 1 | 60% | 1 Instanz für SQLite-Dateisperre |
+| approval-service | 1 | 1 | 70% | 1 Instanz für gRPC & SQLite |
+| budget-service | 1 | 1 | 70% | 1 Instanz für konsistente Finanzprüfung |
+| payout-service | 1 | 1 | 75% | Kafka-Consumer, 1 Instanz |
 | frontend | 1 | 3 | 80% | Nginx, statische Dateien |
 
 ## API-Dokumentation
