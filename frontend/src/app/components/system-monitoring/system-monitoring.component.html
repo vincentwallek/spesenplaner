@@ -1,0 +1,69 @@
+<div class="dashboard-container">
+  <div class="dashboard-header">
+    <h1>System-Monitoring</h1>
+    <div class="header-actions">
+      @if (lastUpdated()) {
+        <span class="last-updated">Aktualisiert: {{ lastUpdated()!.toLocaleTimeString('de-DE') }}</span>
+      }
+      @if (dashboard()) {
+        <span class="system-badge" [ngClass]="dashboard()!.overall_status">
+          <span class="dot"></span>
+          {{ dashboard()!.overall_status === 'healthy' ? 'Alle Systeme OK' :
+             dashboard()!.overall_status === 'degraded' ? 'Eingeschränkt' : 'Störung' }}
+        </span>
+      }
+      <button class="btn btn-secondary btn-sm" (click)="refresh()">
+        ↻ Aktualisieren
+      </button>
+    </div>
+  </div>
+
+  @if (loading() && !dashboard()) {
+    <div class="loading-overlay">
+      <div class="spinner"></div>
+      <span>System-Daten werden geladen…</span>
+    </div>
+  }
+
+  @if (error()) {
+    <div class="glass-card" style="text-align: center; color: var(--color-danger);">
+      <p>{{ error() }}</p>
+      <button class="btn btn-primary btn-sm mt-2" (click)="refresh()">Erneut versuchen</button>
+    </div>
+  }
+
+  @if (dashboard()) {
+    <div class="kpi-grid">
+      <div class="kpi-card accent-orange">
+        <div class="kpi-label">Registrierte Nutzer</div>
+        <div class="kpi-value">{{ dashboard()!.system.registered_users }}</div>
+        <div class="kpi-sub">Gesamt</div>
+      </div>
+
+      <div class="kpi-card accent-blue">
+        <div class="kpi-label">Services</div>
+        <div class="kpi-value">{{ dashboard()!.system.healthy_services }}/{{ dashboard()!.system.services_count }}</div>
+        <div class="kpi-sub">Services verfügbar</div>
+      </div>
+    </div>
+
+    <div class="panels-grid">
+      <div class="panel">
+        <div class="panel-header">
+          <h3>Service-Status</h3>
+        </div>
+        <div class="services-grid">
+          @for (svc of dashboard()!.services; track svc.service) {
+            <div class="service-card">
+              <div class="service-indicator" [ngClass]="svc.status"></div>
+              <div class="service-info">
+                <div class="service-name">{{ svc.service }}</div>
+                <div class="service-time">{{ svc.response_time_ms }}ms</div>
+              </div>
+            </div>
+          }
+        </div>
+      </div>
+    </div>
+  }
+</div>

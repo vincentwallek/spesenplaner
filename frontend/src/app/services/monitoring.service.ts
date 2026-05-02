@@ -11,16 +11,20 @@ export interface ServiceHealth {
   details: any;
 }
 
-export interface MonitoringDashboard {
+export interface BusinessDashboard {
   timestamp: string;
-  overall_status: string;
-  services: ServiceHealth[];
   metrics: {
     expenses: any;
     approvals: any;
     budgets: any;
     payouts: any;
   };
+}
+
+export interface SystemDashboard {
+  timestamp: string;
+  overall_status: string;
+  services: ServiceHealth[];
   system: {
     registered_users: number;
     services_count: number;
@@ -47,9 +51,14 @@ export interface MonitoringLogs {
 export class MonitoringService {
   constructor(private http: HttpClient) {}
 
-  /** Fetch aggregated monitoring dashboard data */
-  getDashboard(): Observable<MonitoringDashboard> {
-    return this.http.get<MonitoringDashboard>(`${API_URL}/monitoring/dashboard`);
+  /** Fetch aggregated business monitoring data */
+  getBusinessDashboard(): Observable<BusinessDashboard> {
+    return this.http.get<BusinessDashboard>(`${API_URL}/monitoring/business`);
+  }
+
+  /** Fetch aggregated system monitoring data */
+  getSystemDashboard(): Observable<SystemDashboard> {
+    return this.http.get<SystemDashboard>(`${API_URL}/monitoring/system`);
   }
 
   /** Fetch recent activity logs */

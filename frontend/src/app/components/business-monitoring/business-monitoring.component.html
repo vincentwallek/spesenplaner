@@ -1,34 +1,24 @@
 <div class="dashboard-container">
-
   <!-- Header -->
   <div class="dashboard-header">
-    <h1>System-Monitoring</h1>
+    <h1>Business-Monitoring</h1>
     <div class="header-actions">
       @if (lastUpdated()) {
         <span class="last-updated">Aktualisiert: {{ lastUpdated()!.toLocaleTimeString('de-DE') }}</span>
       }
-      @if (dashboard()) {
-        <span class="system-badge" [ngClass]="dashboard()!.overall_status">
-          <span class="dot"></span>
-          {{ dashboard()!.overall_status === 'healthy' ? 'Alle Systeme OK' :
-             dashboard()!.overall_status === 'degraded' ? 'Eingeschränkt' : 'Störung' }}
-        </span>
-      }
-      <button class="btn btn-secondary btn-sm" (click)="refresh()" id="btn-refresh-monitoring">
+      <button class="btn btn-secondary btn-sm" (click)="refresh()">
         ↻ Aktualisieren
       </button>
     </div>
   </div>
 
-  <!-- Loading State -->
   @if (loading() && !dashboard()) {
     <div class="loading-overlay">
       <div class="spinner"></div>
-      <span>Monitoring-Daten werden geladen…</span>
+      <span>Business-Daten werden geladen…</span>
     </div>
   }
 
-  <!-- Error State -->
   @if (error()) {
     <div class="glass-card" style="text-align: center; color: var(--color-danger);">
       <p>{{ error() }}</p>
@@ -37,7 +27,6 @@
   }
 
   @if (dashboard()) {
-
     <!-- KPI Cards -->
     <div class="kpi-grid">
       <div class="kpi-card accent-blue">
@@ -63,41 +52,10 @@
         <div class="kpi-value">{{ formatCurrency(totalPaid()) }}</div>
         <div class="kpi-sub">{{ payoutSuccess() }}% Erfolgsrate</div>
       </div>
-
-      <div class="kpi-card accent-orange">
-        <div class="kpi-label">Aktive Nutzer</div>
-        <div class="kpi-value">{{ uniqueUsers() }}</div>
-        <div class="kpi-sub">{{ dashboard()!.system.registered_users }} registriert</div>
-      </div>
-
-      <div class="kpi-card accent-blue">
-        <div class="kpi-label">Services</div>
-        <div class="kpi-value">{{ dashboard()!.system.healthy_services }}/{{ dashboard()!.system.services_count }}</div>
-        <div class="kpi-sub">Services verfügbar</div>
-      </div>
     </div>
 
     <!-- Main Panels -->
     <div class="panels-grid">
-
-      <!-- Service Health Panel -->
-      <div class="panel">
-        <div class="panel-header">
-          <h3>Service-Status</h3>
-        </div>
-        <div class="services-grid">
-          @for (svc of dashboard()!.services; track svc.service) {
-            <div class="service-card">
-              <div class="service-indicator" [ngClass]="svc.status"></div>
-              <div class="service-info">
-                <div class="service-name">{{ svc.service }}</div>
-                <div class="service-time">{{ svc.response_time_ms }}ms</div>
-              </div>
-            </div>
-          }
-        </div>
-      </div>
-
       <!-- Budget Gauge Panel -->
       <div class="panel">
         <div class="panel-header">
@@ -213,6 +171,5 @@
       </div>
 
     </div>
-
   }
 </div>

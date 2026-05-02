@@ -120,7 +120,7 @@ async def list_all_expenses(
     status_filter: Optional[str] = None,
 ):
     """List all expenses (optionally filtered by status)."""
-    created_by = None if (x_user_role or "user").lower() in ("manager", "admin") else x_user_name
+    created_by = None if (x_user_role or "user").lower() == "manager" else x_user_name
     expenses = await list_expenses(session, created_by=created_by, status=status_filter)
     items = [_expense_to_response(e) for e in expenses]
     return {

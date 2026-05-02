@@ -54,9 +54,9 @@ async def get_expense(session: AsyncSession, expense_id: str) -> Optional[Expens
 
 
 def can_access_expense(expense: Expense, username: Optional[str], role: Optional[str]) -> bool:
-    """Role-based access: managers/admins can access all, users only own records."""
+    """Role-based access: managers can access all, users and admins only own records."""
     normalized_role = (role or "user").lower()
-    if normalized_role in ("manager", "admin"):
+    if normalized_role == "manager":
         return True
     return bool(username) and expense.created_by == username
 

@@ -93,11 +93,7 @@ import { AuthService } from '../../services/auth.service';
             }
             @if (!canManageApproval() && expense()!.status === 'SUBMITTED') {
               <div class="status-note status-note-info">
-                @if (expense()!.amount >= 100) {
-                  Wartet auf Freigabe (Beträge ab 100€ erfordern einen Manager).
-                } @else {
-                  Wartet auf Freigabe durch Admin oder Manager.
-                }
+                Wartet auf Freigabe durch einen Manager.
               </div>
             }
             @if (expense()!.status === 'APPROVED') {
@@ -408,26 +404,13 @@ export class ExpenseDetailComponent implements OnInit {
   canManageApproval(): boolean {
     const currentUser = this.auth.currentUser();
     const role = (currentUser?.role || '').toLowerCase();
-    const amount = this.expense()?.amount || 0;
     
     // Cannot approve own expenses
     if (this.expense()?.created_by === currentUser?.username) {
       return false;
     }
     
-    if (role === 'user') {
-      return false; // Users can never approve
-    }
-    
-    if (role === 'admin') {
-      return amount < 100; // Admins can only approve < 100€
-    }
-    
-    if (role === 'manager') {
-      return true; // Managers can approve any amount
-    }
-    
-    return false;
+    return role === 'manager';
   }
 
   approveByManager() {

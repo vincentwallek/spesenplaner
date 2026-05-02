@@ -173,7 +173,6 @@ Erstellen Sie den Namespace und rollen Sie die grundlegende Infrastruktur aus:
 kubectl create namespace reise-spesen-planer --dry-run=client -o yaml | kubectl apply -f -
 
 # Zookeeper und Kafka bereitstellen
-kubectl apply -f k8s/zookeeper/
 kubectl apply -f k8s/kafka/
 ```
 
@@ -208,7 +207,7 @@ Zum Beenden der lokalen Umgebung und zum Entfernen der Ressourcen nutzen Sie fol
 
 #### Port-Forwarding beenden
 ```powershell
-Stop-Process -Name kubectl -Force
+Stop-Process -Name kubectl -Force -ErrorAction SilentlyContinue
 ```
 
 #### Ressourcen entfernen (Optional)
@@ -227,7 +226,7 @@ Das System nutzt Horizontal Pod Autoscaling (HPA) zur Lastverteilung. Aufgrund d
 | approval-service | 1 | 1 | 70% | Konsistente gRPC-Verarbeitung |
 | budget-service | 1 | 1 | 70% | Integrität der Finanzprüfungen |
 | payout-service | 1 | 1 | 75% | Singleton-Consumer für Kafka-Events |
-| frontend | 1 | 3 | 80% | Skalierbarer statischer Webserver |
+| frontend | 2 | 5 | 80% | Hochverfügbarer, zustandsloser Webserver für statische Assets |
 
 ## API-Endpunkte
 

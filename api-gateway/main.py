@@ -110,8 +110,8 @@ async def read_users(
     current_user: TokenData = Depends(get_current_user),
     session: AsyncSession = Depends(get_db)
 ):
-    """Get all users (admin/manager only)."""
-    if current_user.role not in ["admin", "manager"]:
+    """Get all users (admin only)."""
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not enough permissions")
     from auth import get_all_users
     users = await get_all_users(session)
@@ -129,17 +129,14 @@ async def update_role(
     current_user: TokenData = Depends(get_current_user),
     session: AsyncSession = Depends(get_db)
 ):
-    """Update a user's role (admin/manager only)."""
-    if current_user.role not in ["admin", "manager"]:
+    """Update a user's role (admin only)."""
+    if current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Not enough permissions")
     if role_update.role not in ["user", "manager", "admin"]:
         raise HTTPException(status_code=400, detail="Invalid role")
         
     if current_user.username == username:
         raise HTTPException(status_code=403, detail="You cannot change your own role")
-        
-    if current_user.role == "admin" and role_update.role == "manager":
-        raise HTTPException(status_code=403, detail="Admins cannot assign the manager role")
         
     from sqlalchemy import select
     from auth import UserDB, update_user_role
@@ -149,9 +146,6 @@ async def update_role(
     
     if not target_user:
         raise HTTPException(status_code=404, detail="User not found")
-        
-    if current_user.role == "admin" and target_user.role == "manager":
-        raise HTTPException(status_code=403, detail="Admins cannot change the role of a manager")
 
     updated_user = await update_user_role(session, username, role_update.role)
     return updated_user
@@ -215,18 +209,18 @@ async def _fetch_service_metrics(client: httpx.AsyncClient, name: str, base_url:
     return {"service": name, "metrics": None}
 
 
-@app.get("/api/v1/monitoring/dashboard", tags=["Monitoring"])
-async def monitoring_dashboard(
+@app.get("/api/v1/monitoring/system", tags=["Monitoring"])
+async def monitoring_system(
     request: Request,
     current_user: TokenData = Depends(get_current_user),
 ):
     """
-    Aggregated monitoring dashboard data.
-    Fetches health status and metrics from all backend services in parallel.
-    Only accessible by admin and manager roles.
+    Aggregated system monitoring data.
+    Fetches health status from all backend services in parallel.
+    Only accessible by admin role.
     """
-    if current_user.role not in ["admin", "manager"]:
-        raise HTTPException(status_code=403, detail="Monitoring requires admin or manager role")
+    if current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="System monitoring requires admin role")
 
     client: httpx.AsyncClient = request.app.state.http_client
 
@@ -236,16 +230,6 @@ async def monitoring_dashboard(
         for name, info in SERVICE_ENDPOINTS.items()
     ]
     health_results = await asyncio.gather(*health_tasks)
-
-    # Parallel metrics collection
-    metrics_tasks = [
-        _fetch_service_metrics(client, name, info["url"])
-        for name, info in SERVICE_ENDPOINTS.items()
-    ]
-    metrics_results = await asyncio.gather(*metrics_tasks)
-
-    # Build metrics dict keyed by service name
-    metrics_by_service = {m["service"]: m["metrics"] for m in metrics_results}
 
     # Overall system status
     statuses = [h["status"] for h in health_results]
@@ -267,16 +251,46 @@ async def monitoring_dashboard(
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "overall_status": overall_status,
         "services": health_results,
+        "system": {
+            "registered_users": user_count,
+            "services_count": len(SERVICE_ENDPOINTS),
+            "healthy_services": statuses.count("healthy"),
+        },
+    }
+
+@app.get("/api/v1/monitoring/business", tags=["Monitoring"])
+async def monitoring_business(
+    request: Request,
+    current_user: TokenData = Depends(get_current_user),
+):
+    """
+    Aggregated business monitoring data.
+    Fetches metrics from all backend services in parallel.
+    Accessible by admin and manager roles.
+    """
+    if current_user.role not in ["admin", "manager"]:
+        raise HTTPException(status_code=403, detail="Business monitoring requires admin or manager role")
+
+    client: httpx.AsyncClient = request.app.state.http_client
+
+    # Parallel metrics collection
+    metrics_tasks = [
+        _fetch_service_metrics(client, name, info["url"])
+        for name, info in SERVICE_ENDPOINTS.items()
+    ]
+    metrics_results = await asyncio.gather(*metrics_tasks)
+
+    # Build metrics dict keyed by service name
+    metrics_by_service = {m["service"]: m["metrics"] for m in metrics_results}
+
+    from datetime import datetime, timezone
+    return {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "metrics": {
             "expenses": metrics_by_service.get("request-service"),
             "approvals": metrics_by_service.get("approval-service"),
             "budgets": metrics_by_service.get("budget-service"),
             "payouts": metrics_by_service.get("payout-service"),
-        },
-        "system": {
-            "registered_users": user_count,
-            "services_count": len(SERVICE_ENDPOINTS),
-            "healthy_services": statuses.count("healthy"),
         },
     }
 

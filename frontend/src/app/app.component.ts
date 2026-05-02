@@ -33,15 +33,22 @@ import { AuthService } from './services/auth.service';
                 <span>Neuer Antrag</span>
               </a>
             </li>
-            @if (auth.currentUser()?.role === 'admin' || auth.currentUser()?.role === 'manager') {
+            @if (auth.currentUser()?.role === 'admin') {
               <li>
                 <a routerLink="/users" routerLinkActive="active" id="nav-users">
                   <span>Benutzerverwaltung</span>
                 </a>
               </li>
               <li>
-                <a routerLink="/monitoring" routerLinkActive="active" id="nav-monitoring">
-                  <span>Monitoring</span>
+                <a routerLink="/monitoring/system" routerLinkActive="active" id="nav-monitoring-system">
+                  <span>System Monitoring</span>
+                </a>
+              </li>
+            }
+            @if (auth.currentUser()?.role === 'admin' || auth.currentUser()?.role === 'manager') {
+              <li>
+                <a routerLink="/monitoring/business" routerLinkActive="active" id="nav-monitoring-business">
+                  <span>Business Monitoring</span>
                 </a>
               </li>
             }

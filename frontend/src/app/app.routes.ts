@@ -42,9 +42,14 @@ export const routes: Routes = [
           import('./components/user-management/user-management.component').then((m) => m.UserManagementComponent),
       },
       {
-        path: 'monitoring',
+        path: 'monitoring/business',
         loadComponent: () =>
-          import('./components/monitoring-dashboard/monitoring-dashboard.component').then((m) => m.MonitoringDashboardComponent),
+          import('./components/business-monitoring/business-monitoring.component').then((m) => m.BusinessMonitoringComponent),
+      },
+      {
+        path: 'monitoring/system',
+        loadComponent: () =>
+          import('./components/system-monitoring/system-monitoring.component').then((m) => m.SystemMonitoringComponent),
       },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
     ],

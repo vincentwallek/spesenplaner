@@ -41,7 +41,7 @@ import { AuthService } from '../../services/auth.service';
                   <td>
                     <select class="form-control form-control-sm" [(ngModel)]="user.role" style="max-width: 150px;" [disabled]="!canEditRole(user)">
                       <option value="user">User</option>
-                      <option value="manager" [disabled]="auth.currentUser()?.role === 'admin'">Manager</option>
+                      <option value="manager">Manager</option>
                       <option value="admin">Admin</option>
                     </select>
                   </td>
@@ -106,9 +106,6 @@ export class UserManagementComponent implements OnInit {
     
     // Cannot edit self
     if (currentUser.username === user.username) return false;
-    
-    // Admins cannot edit managers
-    if (currentUser.role === 'admin' && user.role === 'manager') return false;
     
     return true;
   }

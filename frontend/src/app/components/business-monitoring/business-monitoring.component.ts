@@ -1,16 +1,16 @@
 import { Component, OnInit, OnDestroy, signal, computed } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MonitoringService, MonitoringDashboard, MonitoringLogs } from '../../services/monitoring.service';
+import { MonitoringService, BusinessDashboard, MonitoringLogs } from '../../services/monitoring.service';
 
 @Component({
-  selector: 'app-monitoring-dashboard',
+  selector: 'app-business-monitoring',
   standalone: true,
   imports: [CommonModule],
-  templateUrl: './monitoring-dashboard.component.html',
-  styleUrl: './monitoring-dashboard.component.css',
+  templateUrl: './business-monitoring.component.html',
+  styleUrl: './business-monitoring.component.css',
 })
-export class MonitoringDashboardComponent implements OnInit, OnDestroy {
-  dashboard = signal<MonitoringDashboard | null>(null);
+export class BusinessMonitoringComponent implements OnInit, OnDestroy {
+  dashboard = signal<BusinessDashboard | null>(null);
   logs = signal<MonitoringLogs | null>(null);
   loading = signal(true);
   error = signal<string | null>(null);
@@ -18,7 +18,6 @@ export class MonitoringDashboardComponent implements OnInit, OnDestroy {
 
   private refreshInterval: any;
 
-  // Computed KPIs
   totalExpenses = computed(() => this.dashboard()?.metrics?.expenses?.total_count ?? 0);
   totalAmount = computed(() => this.dashboard()?.metrics?.expenses?.total_amount ?? 0);
   avgAmount = computed(() => this.dashboard()?.metrics?.expenses?.average_amount ?? 0);
@@ -62,7 +61,6 @@ export class MonitoringDashboardComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadData();
-    // Auto-refresh every 30 seconds
     this.refreshInterval = setInterval(() => this.loadData(), 30000);
   }
 
@@ -73,7 +71,7 @@ export class MonitoringDashboardComponent implements OnInit, OnDestroy {
   }
 
   loadData(): void {
-    this.monitoringService.getDashboard().subscribe({
+    this.monitoringService.getBusinessDashboard().subscribe({
       next: (data) => {
         this.dashboard.set(data);
         this.lastUpdated.set(new Date());
@@ -81,7 +79,7 @@ export class MonitoringDashboardComponent implements OnInit, OnDestroy {
         this.error.set(null);
       },
       error: (err) => {
-        this.error.set('Dashboard-Daten konnten nicht geladen werden.');
+        this.error.set('Business-Dashboard-Daten konnten nicht geladen werden.');
         this.loading.set(false);
       },
     });
